@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Silent Sight v8.5 - Better Mohawk</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Share Tech Mono', monospace; user-select: none; -webkit-user-select: none; color: #eee; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; }
+        canvas { display: block; touch-action: none; }
+        
+        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,0.9) 100%); z-index: 100; pointer-events: none; }
+        .screen { background: rgba(12, 12, 12, 0.98); border: 1px solid #333; border-top: 3px solid #d63031; box-shadow: 0 20px 60px rgba(0,0,0,0.9); padding: 40px; width: 90%; max-width: 650px; text-align: center; display: none; position: relative; pointer-events: auto; }
+        .screen::before { content: "SYSTEM_READY_V8.5"; position: absolute; top: 5px; right: 10px; font-size: 10px; color: #555; letter-spacing: 1px; }
+        .screen.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        h1 { color: #d63031; margin: 0 0 10px; font-size: 3.5em; letter-spacing: 4px; text-transform: uppercase; text-shadow: 0 0 20px rgba(214, 48, 49, 0.4); }
+        h2 { border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 25px; color: #fff; font-size: 1.6em; letter-spacing: 2px; }
+        
+        .mission-info { background: #1a1a1a; padding: 20px; margin: 20px 0; text-align: left; border-left: 3px solid #d63031; color: #ccc; line-height: 1.5; font-size: 1em; }
+        .highlight { color: #d63031; font-weight: bold; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 30px; }
+        .stat-box { background: #222; padding: 10px; border: 1px solid #333; }
+        .stat-label { font-size: 0.7em; color: #666; display: block; margin-bottom: 5px; }
+        .stat-val { font-size: 1.2em; font-weight: bold; color: #fff; }
+
+        .btn-action { background: #d63031; color: #fff; border: none; padding: 15px 40px; font-size: 20px; font-weight: bold; font-family: 'Share Tech Mono', monospace; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 2px; margin-top: 10px; box-shadow: 0 5px 15px rgba(214, 48, 49, 0.3); pointer-events: auto !important; position: relative; z-index: 1000; width: 100%; max-width: 300px; }
+        .btn-action:hover { background: #ff4757; transform: scale(1.05); }
+        .btn-action:active { transform: scale(0.95); background: #ff4757; }
+
+        #hud { position: absolute; top: 20px; left: 20px; background: rgba(0, 0, 0, 0.85); padding: 15px; border: 1px solid #555; border-left: 4px solid #00ff9d; border-radius: 4px; color: #00ff9d; font-size: 22px; font-weight: bold; text-shadow: 0 0 5px #00ff9d; display: none; pointer-events: none; z-index: 2000; }
+        #hud span { color: #ffffff; margin-left: 10px; text-shadow: 0 0 10px rgba(255,255,255,0.8); }
+        #hud-wind-dir { color: #ff3300 !important; text-shadow: 0 0 10px #ff3300 !important; }
+
+        #fire-btn-mobile { position: absolute; bottom: 40px; right: 40px; width: 90px; height: 90px; background: rgba(214, 48, 49, 0.8); border: 4px solid #fff; border-radius: 50%; color: white; font-weight: bold; font-family: 'Share Tech Mono', monospace; font-size: 16px; letter-spacing: 1px; display: none; justify-content: center; align-items: center; z-index: 3000; pointer-events: auto; touch-action: manipulation; box-shadow: 0 0 30px rgba(214, 48, 49, 0.9); user-select: none; text-shadow: 0 0 5px #fff; }
+        #fire-btn-mobile:active { background: rgba(255, 50, 50, 1); transform: scale(0.92); }
+        @media (min-width: 769px) { #fire-btn-mobile { display: none !important; } }
+
+        #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; transition: opacity 0.05s; mix-blend-mode: overlay; z-index: 1500; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="flash"></div>
+    <div id="hud">
+        <div>WIND:<span id="hud-wind">0.0</span> <span id="hud-wind-dir"></span></div>
+        <div>DIST:<span id="hud-dist">0</span><span>m</span></div>
+    </div>
+    <div id="fire-btn-mobile">FIRE</div>
+
+    <div class="ui-layer">
+        <div id="menu-screen" class="screen active">
+            <h1>Silent Sight</h1>
+            <div style="margin-bottom: 30px; color: #aaa;">v8.5 - Better Mohawk</div>
+            <div style="text-align: left; background: #151515; padding: 15px; font-size: 0.85em; color: #888; margin-bottom: 20px; border: 1px dashed #333;">
+                <strong>MISSION PROTOCOL:</strong><br>
+                1. Level 1 is a calibration test (Zero Wind/Distance).<br>
+                2. Difficulty increases with each contract.<br>
+                3. Read the profile carefully. Targets vary by Age, Hair, Hat color, and Pets.<br>
+                4. Account for heavy traffic.
+            </div>
+            <button id="btn-start" class="btn-action">INITIATE</button>
+        </div>
+
+        <div id="briefing-screen" class="screen">
+            <h2>TARGET PROFILE</h2>
+            <div class="mission-info" id="brief-text">...</div>
+            <div class="stats-grid">
+                <div class="stat-box"><span class="stat-label">WIND</span><span class="stat-val" id="brief-wind">0.0</span></div>
+                <div class="stat-box"><span class="stat-label">DIR</span><span class="stat-val" id="brief-wind-dir">-</span></div>
+                <div class="stat-box"><span class="stat-label">DIST</span><span class="stat-val" id="brief-dist">0m</span></div>
+                <div class="stat-box"><span class="stat-label">PAY</span><span class="stat-val" id="brief-reward">$0</span></div>
+            </div>
+            <button id="btn-accept" class="btn-action">ACCEPT</button>
+        </div>
+
+        <div id="debrief-screen" class="screen">
+            <h2 id="end-status">STATUS</h2>
+            <p id="end-msg" style="font-size: 1.3em; color: #eee; margin: 30px 0;">...</p>
+            <div id="reward-display" style="color: #2ecc71; font-size: 1.2em; margin-bottom: 20px;"></div>
+            <button id="btn-next" class="btn-action">NEXT</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- CONFIG ---
+const SCOPE_DOT_GAP = 60; 
+const DIST_SCALE = 200;   
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let width = window.innerWidth;
+let height = window.innerHeight;
+
+// --- COLORS ---
+const COLORS = {
+    hair: { 'blonde': '#f1c40f', 'black': '#1a1a1a', 'red': '#e74c3c', 'gray': '#95a5a6' },
+    hat:  { 'blue': '#3498db', 'red': '#c0392b', 'yellow': '#f39c12', 'green': '#27ae60' }
+};
+
+// --- CLASSES ---
+class Bird {
+    constructor() {
+        this.x = width + Math.random() * 500;
+        this.y = Math.random() * (height * 0.3);
+        this.speed = 2 + Math.random() * 2;
+        this.wingSpan = 10 + Math.random() * 5;
+        this.flapSpeed = 0.15; this.flap = 0;
+    }
+    update() { this.x -= this.speed; this.flap += this.flapSpeed; if(this.x < -50) { this.x = width + 100 + Math.random() * 200; this.y = Math.random() * (height * 0.3); } }
+    draw(ctx) {
+        ctx.save(); ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.beginPath();
+        let wingY = Math.sin(this.flap) * 5;
+        ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.wingSpan/2, this.y - wingY);
+        ctx.moveTo(this.x, this.y); ctx.lineTo(this.x - this.wingSpan/2, this.y - wingY);
+        ctx.stroke(); ctx.restore();
+    }
+}
+
+class Car {
+    constructor(yLevel, laneDir) {
+        this.width = 160; this.height = 55;
+        this.y = yLevel; this.dir = laneDir;
+        this.x = this.dir === 1 ? -250 : width + 50;
+        this.speed = (5 + Math.random() * 2) * this.dir;
+        this.baseColor = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400'][Math.floor(Math.random()*5)];
+    }
+    update() { this.x += this.speed; }
+    draw(ctx, isNight) {
+        ctx.save(); ctx.filter = isNight ? 'brightness(0.7)' : 'none';
+        if(isNight) {
+            ctx.save(); ctx.globalCompositeOperation = 'screen';
+            let beamGrad = ctx.createLinearGradient(this.x, this.y, this.x + (250*this.dir), this.y);
+            beamGrad.addColorStop(0, 'rgba(255, 255, 200, 0.6)'); beamGrad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+            ctx.fillStyle = beamGrad; ctx.beginPath();
+            let frontX = this.dir === 1 ? this.x + this.width : this.x;
+            ctx.moveTo(frontX, this.y + 25); ctx.lineTo(frontX + (250*this.dir), this.y + 5); ctx.lineTo(frontX + (250*this.dir), this.y + 55); ctx.fill(); ctx.restore();
+        }
+
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(this.x + this.width/2, this.y + this.height - 5, this.width/2 + 5, 12, 0, 0, Math.PI*2); ctx.fill();
+        let grad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height); grad.addColorStop(0, this.baseColor); grad.addColorStop(1, '#2c3e50'); ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.moveTo(this.x, this.y + 20); ctx.lineTo(this.x + 25, this.y); ctx.lineTo(this.x + this.width - 35, this.y); ctx.lineTo(this.x + this.width, this.y + 20); ctx.lineTo(this.x + this.width, this.y + 45); ctx.lineTo(this.x, this.y + 45); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.moveTo(this.x + 35, this.y); ctx.lineTo(this.x + 55, this.y - 20); ctx.lineTo(this.x + this.width - 55, this.y - 20); ctx.lineTo(this.x + this.width - 35, this.y); ctx.fill();
+        ctx.fillStyle = isNight ? '#34495e' : '#bdc3c7'; ctx.beginPath(); ctx.moveTo(this.x + 38, this.y - 2); ctx.lineTo(this.x + 56, this.y - 18); ctx.lineTo(this.x + this.width - 56, this.y - 18); ctx.lineTo(this.x + this.width - 38, this.y - 2); ctx.fill();
+        ctx.filter = 'none';
+        this.drawWheel(ctx, this.x + 35, this.y + 40); this.drawWheel(ctx, this.x + this.width - 35, this.y + 40);
+        let lightY = this.y + 25;
+        if (this.dir === 1) { this.drawLight(ctx, this.x + this.width - 5, lightY, '#f1c40f', isNight); this.drawLight(ctx, this.x, lightY, '#e74c3c', isNight); } 
+        else { this.drawLight(ctx, this.x, lightY, '#f1c40f', isNight); this.drawLight(ctx, this.x + this.width - 5, lightY, '#e74c3c', isNight); }
+        ctx.restore();
+    }
+    drawWheel(ctx, x, y) { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI*2); ctx.fill(); }
+    drawLight(ctx, x, y, color, isNight) { ctx.fillStyle = color; if(isNight) { ctx.shadowColor = color; ctx.shadowBlur = 15; } ctx.fillRect(x, y, 5, 10); ctx.shadowBlur = 0; }
+    isOffScreen() { return (this.dir === 1 && this.x > width + 300) || (this.dir === -1 && this.x < -300); }
+}
+
+class Truck extends Car {
+    constructor(yLevel, laneDir) {
+        super(yLevel, laneDir); this.width = 320; this.height = 110; this.y = yLevel - 55; this.speed = (3 + Math.random() * 1.5) * this.dir;
+        this.trailerColor = ['#95a5a6', '#7f8c8d', '#bdc3c7'][Math.floor(Math.random()*3)];
+    }
+    draw(ctx, isNight) {
+        ctx.save(); ctx.filter = isNight ? 'brightness(0.7)' : 'none';
+        if(isNight) {
+            ctx.save(); ctx.globalCompositeOperation = 'screen';
+            let beamGrad = ctx.createLinearGradient(this.x, this.y, this.x + (300*this.dir), this.y);
+            beamGrad.addColorStop(0, 'rgba(255, 255, 200, 0.6)'); beamGrad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+            ctx.fillStyle = beamGrad; ctx.beginPath();
+            let frontX = this.dir === 1 ? this.x + this.width : this.x;
+            ctx.moveTo(frontX, this.y + 80); ctx.lineTo(frontX + (300*this.dir), this.y + 40); ctx.lineTo(frontX + (300*this.dir), this.y + 120); ctx.fill(); ctx.restore();
+        }
+
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(this.x + this.width/2, this.y + this.height - 5, this.width/2 + 10, 18, 0, 0, Math.PI*2); ctx.fill();
+        let cabW = 80; let trailerW = this.width - cabW - 10; let cabX = this.dir === 1 ? this.x + trailerW + 10 : this.x; let trailerX = this.dir === 1 ? this.x : this.x + cabW + 10;
+        ctx.fillStyle = this.trailerColor; ctx.fillRect(trailerX, this.y, trailerW, this.height - 20);
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 3; for(let i=trailerX+30; i<trailerX + trailerW - 30; i+=40) { ctx.beginPath(); ctx.moveTo(i, this.y); ctx.lineTo(i, this.y + this.height - 20); ctx.stroke(); }
+        ctx.fillStyle = this.baseColor; ctx.fillRect(cabX, this.y + 35, cabW, this.height - 55); ctx.fillRect(cabX + (this.dir===1?10:0), this.y + 5, cabW-10, 30);
+        ctx.fillStyle = isNight ? '#34495e' : '#bdc3c7'; let winX = this.dir === 1 ? cabX + 45 : cabX + 5; ctx.fillRect(winX, this.y + 10, 30, 20);
+        ctx.filter = 'none'; let wY = this.y + this.height - 15;
+        this.drawWheel(ctx, cabX + 25, wY); this.drawWheel(ctx, cabX + cabW - 25, wY);
+        if(this.dir === 1) { this.drawWheel(ctx, trailerX + 30, wY); this.drawWheel(ctx, trailerX + 70, wY); this.drawWheel(ctx, trailerX + 110, wY); }
+        else { this.drawWheel(ctx, trailerX + trailerW - 30, wY); this.drawWheel(ctx, trailerX + trailerW - 70, wY); this.drawWheel(ctx, trailerX + trailerW - 110, wY); }
+        ctx.restore();
+    }
+}
+
+class Stickman {
+    constructor(x, y, type, props = {}) {
+        this.x = x; this.y = y; this.type = type; this.props = props;
+        this.dead = false; this.frame = Math.random() * 10; this.dir = Math.random() > 0.5 ? 1 : -1; this.isTarget = props.isTarget || false;
+        this.scale = props.age === 'child' ? 0.6 : 1.0;
+        this.speed = props.age === 'old' ? 0.3 : (props.age === 'child' ? 0.9 : 0.7);
+        this.hunch = props.age === 'old';
+    }
+    update() {
+        if(this.dead) return;
+        if(this.type === 'walking') { this.x += this.speed * this.dir; this.frame += 0.1; if(this.x > width + 100 || this.x < -100) this.dir *= -1; }
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.scale, this.scale);
+        ctx.strokeStyle = '#000'; ctx.fillStyle = '#000'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        let bob = (!this.dead && this.type === 'walking') ? Math.abs(Math.sin(this.frame*2))*3 : 0;
+        let leg = (!this.dead && this.type === 'walking') ? Math.sin(this.frame)*10 : 0;
+        let arm = (!this.dead && this.type === 'walking') ? Math.sin(this.frame)*12 : 0;
+        if(this.dead) { ctx.translate(0, 30); ctx.rotate(1.57); ctx.translate(0, -30); }
+
+        if(this.props.pet && this.props.pet !== 'none' && !this.dead) {
+            ctx.save(); let petX = 50 * this.dir, pScale = this.props.pet === 'small_dog' ? 1 : 1.5, pColor = this.props.pet === 'small_dog' ? '#8d6e63' : '#7f8c8d';
+            ctx.translate(petX, 50); ctx.scale(pScale, pScale); ctx.strokeStyle = pColor; ctx.fillStyle = pColor;
+            ctx.beginPath(); ctx.moveTo(-10,0); ctx.lineTo(10,0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(12*this.dir, -5, 5, 0, Math.PI*2); ctx.fill();
+            let pLeg = Math.sin(this.frame*3)*5; ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(-8+pLeg, 10); ctx.moveTo(8,0); ctx.lineTo(8-pLeg, 10); ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.save(); if(this.hunch) ctx.rotate(this.dir * 0.2);
+        let headY = -30 - bob;
+        
+        if (!this.props.hat && this.props.hairStyle) {
+            ctx.fillStyle = COLORS.hair[this.props.hairColor] || '#000';
+            if (this.props.hairStyle === 'afro') {
+                ctx.beginPath(); ctx.arc(0, headY-4, 15, 0, Math.PI*2); ctx.fill(); 
+                ctx.beginPath(); ctx.arc(-10, headY-8, 10, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(10, headY-8, 10, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(-12, headY+1, 9, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(12, headY+1, 9, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(0, headY-15, 11, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(-6, headY-16, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(6, headY-16, 8, 0, Math.PI*2); ctx.fill();
+            } else if (this.props.hairStyle === 'spiky') {
+                ctx.save();
+                ctx.translate(0, headY);
+                ctx.rotate(-Math.PI / 2.5);
+
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -7);
+                    
+                    ctx.quadraticCurveTo(10, -18, 16, -8);
+                    ctx.quadraticCurveTo(8, -12, 3, -7);
+                    ctx.fill();
+                    ctx.rotate(Math.PI / 8);
+                }
+                ctx.restore();
+            } else if (this.props.hairStyle === 'short') { ctx.beginPath(); ctx.arc(0, headY-2, 9, 0, Math.PI*2); ctx.fill(); }
+        }
+
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, headY, 8, 0, Math.PI*2); ctx.fill();
+        if(this.props.hat) { ctx.fillStyle = COLORS.hat[this.props.hat]; ctx.fillRect(-10, headY - 12, 20, 7); ctx.fillRect(-8, headY - 18, 16, 6); } 
+
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, headY); if(this.hunch) ctx.quadraticCurveTo(-5*this.dir, 0, 0, 10); else ctx.lineTo(0, 10); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, headY + 10); ctx.lineTo(-12 + arm, 5); ctx.moveTo(0, headY + 10); ctx.lineTo(12 - arm, 5); ctx.stroke();
+
+        if(this.props.item === 'briefcase') { 
+            ctx.fillStyle = '#5d4037'; let handX = 12 - arm; let handY = 5; ctx.fillRect(handX - 8, handY, 16, 12);
+            ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(handX-4, handY); ctx.lineTo(handX-4, handY-4); ctx.lineTo(handX+4, handY-4); ctx.lineTo(handX+4, handY); ctx.stroke();
+        } 
+        else if (this.props.item === 'cane' && this.hunch) { ctx.strokeStyle = '#333'; let hx = 12 - arm; ctx.beginPath(); ctx.moveTo(hx, 5); ctx.lineTo(hx + (10*this.dir), 50); ctx.stroke(); } 
+        else if (this.props.item === 'gun') { ctx.fillStyle = '#000'; let hx = 12 - arm; ctx.fillRect(hx, 5-bob, 10*this.dir, 4); ctx.fillRect(hx, 5-bob, 3, 6); }
+        else if (this.props.item === 'balloon') { ctx.strokeStyle = '#fff'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(12-arm, 5); ctx.lineTo(12-arm, -40); ctx.stroke(); ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(12-arm, -45, 8, 0, Math.PI*2); ctx.fill(); }
+        ctx.restore();
+
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(-5 - leg, 50); ctx.moveTo(0, 10); ctx.lineTo(5 + leg, 50); ctx.stroke();
+        ctx.restore();
+    }
+    hitTest(bx, by) { let h = 100 * this.scale, w = 40 * this.scale; return (!this.dead && Math.abs(bx - this.x) < w/2 && by > (this.y - h) && by < (this.y + 10)); }
+}
+
+const world = {
+    groundY: 0, roadY: 0, sidewalkY: 0, lane1Y: 0, lane2Y: 0, buildings: [], groundObjects: [],
+    init(w, h) {
+        this.groundY = h * 0.6; this.sidewalkY = h * 0.75; this.roadY = h * 0.82; this.lane1Y = this.roadY - 15; this.lane2Y = this.roadY + 65;
+        this.buildings = []; for(let i=-100; i<w+100; i+=100 + Math.random()*120) { let bX=i, bW=80+Math.random()*100, bH=200+Math.random()*250, bY=this.groundY+20, wins=[]; for(let wy=bY-bH+20; wy<bY-20; wy+=30) for(let wx=bX+10; wx<bX+bW-15; wx+=25) if(Math.random()>0.4) wins.push({x:wx,y:wy}); this.buildings.push({ x:bX, y:bY, w:bW, h:bH, color:['#2c3e50','#34495e','#2f3640'][Math.floor(Math.random()*3)], wins:wins }); }
+        this.groundObjects = []; for(let i=0; i<w; i+= 40 + Math.random()*60) this.groundObjects.push({ x: i, y: this.groundY + Math.random() * (this.sidewalkY - this.groundY - 20), type: Math.random() > 0.7 ? 'rock' : 'bush', size: 10 + Math.random() * 15 });
+    },
+    draw(ctx, w, h, isNight) {
+        let sky = ctx.createLinearGradient(0,0,0,h); isNight ? (sky.addColorStop(0,"#050505"), sky.addColorStop(1,"#1a1a2e")) : (sky.addColorStop(0,"#1e3c72"), sky.addColorStop(1,"#2a5298")); ctx.fillStyle = sky; ctx.fillRect(0,0,w,h);
+        if(isNight) { ctx.fillStyle = '#fff'; for(let i=0; i<50; i++) { if(Math.random()>0.9) ctx.fillRect(Math.random()*w, Math.random()*h*0.5, 2, 2); } }
+        this.buildings.forEach(b => {
+            ctx.fillStyle = isNight ? '#111' : b.color; ctx.fillRect(b.x, b.y - b.h, b.w, b.h);
+            ctx.fillStyle = isNight ? '#f1c40f' : 'rgba(255,255,230,0.4)'; if(isNight) { ctx.shadowColor='#f1c40f'; ctx.shadowBlur=10; } if(b.wins) b.wins.forEach(w => ctx.fillRect(w.x, w.y, 15, 20)); ctx.shadowBlur=0;
+        });
+        let gG = ctx.createLinearGradient(0, this.groundY, 0, this.roadY); gG.addColorStop(0, isNight?"#0e361a":"#27ae60"); gG.addColorStop(1, isNight?"#114722":"#2ecc71"); ctx.fillStyle = gG; ctx.fillRect(0, this.groundY, w, this.roadY - this.groundY);
+        this.groundObjects.forEach(o => { if(o.type === 'bush') { ctx.fillStyle = isNight ? '#052912' : '#1e824c'; ctx.beginPath(); ctx.arc(o.x, o.y, o.size, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x+o.size/2, o.y-5, o.size*0.8, 0, Math.PI*2); ctx.fill(); } else { ctx.fillStyle = isNight ? '#333' : '#7f8c8d'; ctx.beginPath(); ctx.arc(o.x, o.y, o.size/2, 0, Math.PI*2); ctx.fill(); } });
+        ctx.fillStyle = isNight ? '#444' : '#95a5a6'; ctx.fillRect(0, this.sidewalkY, w, this.roadY - this.sidewalkY); ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0, this.sidewalkY); ctx.lineTo(w, this.sidewalkY); ctx.stroke();
+        ctx.fillStyle = isNight ? '#222' : '#34495e'; ctx.fillRect(0, this.roadY - 20, w, h - (this.roadY - 20)); ctx.strokeStyle = '#ecf0f1'; ctx.lineWidth = 4; ctx.setLineDash([40, 40]); ctx.beginPath(); ctx.moveTo(0, this.roadY + 50); ctx.lineTo(w, this.roadY + 50); ctx.stroke(); ctx.setLineDash([]);
+        if(isNight) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; for(let i=0; i<20; i++) ctx.beginPath(), ctx.arc(Math.random()*w, this.groundY + Math.random()*200, Math.random()*3, 0, Math.PI*2), ctx.fill(); }
+    }
+};
+
+function getRandomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function createRandomStickman(isTarget) {
+    const props = { isTarget: isTarget };
+    
+    if (isTarget) {
+        props.age = Math.random() < 0.25 ? 'old' : 'adult';
+    } else {
+        const r = Math.random();
+        if (r < 0.15) props.age = 'child';
+        else if (r < 0.3) props.age = 'old';
+        else props.age = 'adult';
+    }
+
+    if (props.age === 'old') { props.item = 'cane'; props.pet = 'none'; props.hairColor = 'gray'; props.hairStyle = 'short'; } 
+    else if (props.age === 'child') { props.item = Math.random() > 0.5 ? 'balloon' : 'none'; props.pet = Math.random() > 0.7 ? 'small_dog' : 'none'; } 
+    else { props.item = getRandomItem(['none', 'none', 'briefcase', 'gun']); props.pet = getRandomItem(['none', 'none', 'none', 'small_dog', 'big_dog']); }
+    
+    if (Math.random() > 0.5) { props.hat = getRandomItem(['blue', 'red', 'yellow', 'green']); props.hairStyle = null; } 
+    else { props.hat = null; props.hairStyle = getRandomItem(['spiky', 'afro', 'short']); if (!props.hairColor) props.hairColor = getRandomItem(['black', 'blonde', 'red', 'gray']); }
+    
+    return new Stickman(0, 0, 'walking', props);
+}
+function generateBriefing(target) {
+    let desc = `SUBJECT: <span class='highlight'>${target.props.age.toUpperCase()}</span>.`;
+    if (target.props.hat) desc += ` HEAD: <span class='highlight'>${target.props.hat.toUpperCase()} HAT</span>.`; else desc += ` HAIR: <span class='highlight'>${target.props.hairColor ? target.props.hairColor.toUpperCase() : ""} ${target.props.hairStyle.toUpperCase()}</span>.`;
+    if (target.props.item && target.props.item !== 'none') desc += ` ITEM: <span class='highlight'>${target.props.item.toUpperCase()}</span>.`;
+    if (target.props.pet && target.props.pet !== 'none') desc += ` PET: <span class='highlight'>${target.props.pet.toUpperCase().replace('_', ' ')}</span>.`;
+    return desc;
+}
+
+const state = { mode: 'MENU', missionIdx: 0, targets: [], cars: [], birds: [], scope: { x: 0, y: 0 }, mouse: { x: null, y: null }, lastShot: null, isNight: false, currentMission: {} };
+
+const game = {
+    init() {
+        document.getElementById('btn-start').addEventListener('click', () => this.startCampaign());
+        document.getElementById('btn-accept').addEventListener('click', () => this.startMission());
+        document.getElementById('btn-next').addEventListener('click', () => this.nextLevel());
+        window.addEventListener('resize', () => { width = window.innerWidth; height = window.innerHeight; canvas.width = width; canvas.height = height; world.init(width, height); });
+        window.addEventListener('mousemove', e => { state.mouse.x = e.clientX; state.mouse.y = e.clientY; });
+        window.addEventListener('touchmove', e => { e.preventDefault(); state.mouse.x = e.touches[0].clientX; state.mouse.y = e.touches[0].clientY; }, {passive:false});
+        window.addEventListener('mousedown', (e) => { if(e.target.tagName === 'CANVAS') this.shoot(); });
+        const fireBtn = document.getElementById('fire-btn-mobile');
+        fireBtn.addEventListener('touchstart', (e) => this.shoot(e), {passive:false}); fireBtn.addEventListener('click', (e) => this.shoot(e));
+        state.mouse.x = width / 2; state.mouse.y = height / 2;
+        width = window.innerWidth; height = window.innerHeight; canvas.width = width; canvas.height = height; world.init(width, height);
+        requestAnimationFrame(() => this.loop());
+    },
+    setScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        const el = document.getElementById(id + '-screen'); if(el) el.classList.add('active');
+        state.mode = id.toUpperCase().replace('-SCREEN', '');
+        const hud = document.getElementById('hud'), btn = document.getElementById('fire-btn-mobile');
+        if(state.mode === 'PLAYING') { canvas.classList.add('ingame'); hud.style.display = 'block'; btn.style.display = 'flex'; } 
+        else { canvas.classList.remove('ingame'); hud.style.display = 'none'; btn.style.display = 'none'; }
+    },
+    startCampaign: function() { state.missionIdx = 0; this.loadLevel(0); },
+    loadLevel(level) {
+        if(level >= 5) { 
+            this.setScreen('menu'); document.querySelector('#menu-screen h1').innerText = "CONTRACTS COMPLETE"; document.querySelector('#menu-screen .flavor-text').innerText = "Funds transferred. System going dark."; document.getElementById('btn-start').innerText = "RESTART SYSTEM"; document.getElementById('btn-start').onclick = () => location.reload(); return; 
+        }
+        const isLevel1 = (level === 0);
+        const windStrength = isLevel1 ? 0.0 : (Math.random() * (level + 1) * 0.8).toFixed(1) * (Math.random()>0.5?1:-1);
+        const dist = isLevel1 ? 0 : 200 + (level * 150);
+        const reward = 200 + (level * 250);
+        const isNight = level > 1 && Math.random() > 0.5;
+        
+        const targets = []; const targetStickman = createRandomStickman(true); targets.push(targetStickman);
+        const civCount = 2 + level; 
+        for(let i=0; i<civCount; i++) {
+            let civ = createRandomStickman(false);
+            let safety = 0;
+            while(generateBriefing(civ) === generateBriefing(targetStickman) && safety < 10) { civ = createRandomStickman(false); safety++; }
+            targets.push(civ);
+        }
+        const pad = width / (targets.length + 1);
+        targets.forEach((t, i) => { t.x = (i + 1) * pad + (Math.random() * 50 - 25); t.y = world.roadY - 90; });
+
+        state.currentMission = { wind: windStrength, dist: dist, reward: reward, isNight: isNight, desc: generateBriefing(targetStickman), targets: targets, hasBirds: (!isNight || level > 2) };
+        document.getElementById('brief-text').innerHTML = state.currentMission.desc + (isNight ? "<br><br>CONDITION: <span class='highlight'>NIGHT OPS</span>" : "");
+        document.getElementById('brief-wind').innerText = Math.abs(windStrength);
+        document.getElementById('brief-wind-dir').innerText = windStrength > 0 ? "FROM LEFT (>>)" : (windStrength < 0 ? "FROM RIGHT (<<)" : "CALM");
+        document.getElementById('brief-dist').innerText = dist + "m";
+        document.getElementById('brief-reward').innerText = "$" + reward;
+        this.setScreen('briefing');
+    },
+    startMission: function() {
+        const m = state.currentMission; state.targets = m.targets;
+        state.cars = []; state.birds = []; state.scope.x = width/2; state.scope.y = height/2; state.lastShot = null;
+        state.isNight = m.isNight; 
+        if(m.hasBirds) for(let i=0; i<3; i++) state.birds.push(new Bird());
+        document.getElementById('hud-wind').innerText = Math.abs(m.wind).toFixed(1); 
+        document.getElementById('hud-wind-dir').innerText = m.wind > 0 ? ">>" : (m.wind < 0 ? "<<" : "");
+        document.getElementById('hud-dist').innerText = m.dist;
+        this.setScreen('playing');
+        this.setupTraffic(world.lane1Y, world.lane2Y);
+    },
+    setupTraffic(lane1Y, lane2Y) {
+        if(this.trafficInterval) clearInterval(this.trafficInterval);
+        this.trafficInterval = setInterval(() => {
+            if(state.mode !== 'PLAYING') return;
+            if(Math.random() < 0.03) state.cars.push(Math.random() < 0.3 ? new Truck(lane1Y, 1) : new Car(lane1Y, 1));
+            if(Math.random() < 0.03) state.cars.push(Math.random() < 0.3 ? new Truck(lane2Y, -1) : new Car(lane2Y, -1));
+        }, 1000);
+    },
+    shoot(e) {
+        if(e) { e.preventDefault(); e.stopPropagation(); }
+        if(state.mode !== 'PLAYING') return;
+        const m = state.currentMission;
+        const hitX = state.scope.x + (m.wind * SCOPE_DOT_GAP); const hitY = state.scope.y + ((m.dist / DIST_SCALE) * SCOPE_DOT_GAP);
+        state.scope.y -= 50; const f = document.getElementById('flash'); f.style.opacity = 0.8; setTimeout(() => f.style.opacity = 0, 50);
+        state.lastShot = {x: hitX, y: hitY, t: Date.now()};
+        let result = 'miss'; 
+        state.cars.forEach(c => { if(hitX > c.x && hitX < c.x + c.width && hitY > c.y && hitY < c.y + c.height) result = 'car'; });
+        if(result !== 'car') state.targets.forEach(t => { if(t.hitTest(hitX, hitY)) { t.dead = true; result = t.isTarget ? 'win' : 'fail'; } });
+        setTimeout(() => {
+            if(result === 'win') this.endMission(true, "TARGET ELIMINATED");
+            else if(result === 'fail') this.endMission(false, "CIVILIAN CASUALTY - FAILURE");
+            else if(result === 'car') this.endMission(false, "SHOT BLOCKED BY VEHICLE");
+            else this.endMission(false, "MISSED - TARGET ALERTED");
+        }, 1500);
+    },
+    endMission: function(success, msg) {
+        if(this.trafficInterval) clearInterval(this.trafficInterval);
+        this.setScreen('debrief'); document.getElementById('end-status').innerText = success ? "SUCCESS" : "FAILURE";
+        document.getElementById('end-status').style.color = success ? "#2ecc71" : "#d63031"; 
+        document.getElementById('end-msg').innerText = msg;
+        document.getElementById('reward-display').innerText = success ? ("PAYOUT: $" + state.currentMission.reward) : "NO PAYMENT";
+        if(success) state.missionIdx++;
+    },
+    nextLevel: function() { this.loadLevel(state.missionIdx); },
+    loop: function() {
+        requestAnimationFrame(() => this.loop());
+        if (state.mouse.x === null) { state.mouse.x = width/2; state.mouse.y = height/2; }
+        state.scope.x += (state.mouse.x - state.scope.x) * 0.15; state.scope.y += (state.mouse.y - state.scope.y) * 0.15;
+        const time = Date.now() / 1000; const scopeX = state.scope.x + Math.sin(time) * 1.0; const scopeY = state.scope.y + Math.cos(time * 0.8) * 1.0;
+
+        world.draw(ctx, width, height, state.isNight);
+        state.birds.forEach(b => { b.update(); b.draw(ctx); });
+        state.targets.forEach(t => { t.update(); t.draw(ctx); });
+        state.cars = state.cars.filter(c => !c.isOffScreen()); state.cars.forEach(c => c.update());
+        state.cars.filter(c => c.dir === 1).forEach(c => c.draw(ctx, state.isNight));
+        state.cars.filter(c => c.dir === -1).forEach(c => c.draw(ctx, state.isNight));
+        if(state.lastShot && (Date.now() - state.lastShot.t < 1000)) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(state.lastShot.x, state.lastShot.y, 5, 0, Math.PI*2); ctx.fill(); }
+
+        if(state.mode === 'PLAYING') {
+            const r = height * 0.4; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.arc(scopeX, scopeY, r, 0, Math.PI*2, true); ctx.fill('evenodd');
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(scopeX, scopeY - r); ctx.lineTo(scopeX, scopeY + r); ctx.moveTo(scopeX - r, scopeY); ctx.lineTo(scopeX + r, scopeY); ctx.stroke();
+            ctx.fillStyle = '#000'; for(let i=1; i<=4; i++) { const dist = i * SCOPE_DOT_GAP; drawDot(ctx, scopeX + dist, scopeY); drawDot(ctx, scopeX - dist, scopeY); drawDot(ctx, scopeX, scopeY + dist); drawDot(ctx, scopeX, scopeY - dist); }
+            const grad = ctx.createRadialGradient(scopeX, scopeY, r * 0.7, scopeX, scopeY, r + 20); grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(0.9, 'rgba(0,0,0,0.8)'); grad.addColorStop(1, '#000'); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(scopeX, scopeY, r + 20, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 15; ctx.beginPath(); ctx.arc(scopeX, scopeY, r, 0, Math.PI*2); ctx.stroke();
+        }
+    }
+};
+function drawDot(ctx, x, y) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI*2); ctx.fill(); }
+window.onload = function() { game.init(); };
+</script>
+</body>
+</html>
